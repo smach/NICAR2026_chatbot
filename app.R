@@ -344,12 +344,12 @@ server <- function(input, output, session) {
   # Handle API key submission
   observeEvent(input$submit_api_key, {
     key <- input$api_key_input
-    if (nchar(key) > 10 && startsWith(key, "sk-")) {
+    if (nchar(key) > 20) {
       user_api_key(key)
       removeModal()
     } else {
       showNotification(
-        "Please enter a valid OpenAI API key (starts with 'sk-')",
+        "Please enter a valid key",
         type = "error"
       )
     }
