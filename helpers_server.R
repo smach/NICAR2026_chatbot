@@ -5,6 +5,17 @@ handle_question_button <- function(query, chat_obj) {
     tryCatch({
       response_stream <- chat$stream_async(query)
       chat_append("session_chat", response_stream) %>%
+        then(function(result) {
+          # Log token usage after stream completes
+          usage <- extract_last_turn_usage(chat)
+          if (!is.null(usage)) {
+            log_api_usage(
+              input_tokens = usage$input_tokens,
+              output_tokens = usage$output_tokens,
+              model = "gemini-3-flash-preview"
+            )
+          }
+        }) %>%
         catch(function(error) {
           chat_append("session_chat", paste("Sorry, I had trouble searching for sessions:", error$message))
         })

@@ -1,10 +1,12 @@
 # NICAR 2026 Session Explorer
 
-This is an AI-powered conference session discovery tool for NICAR 2026 (National Institute for Computer-Assisted Reporting), taking place March 5-8, 2026 in Indianapolis.
+This repo features an R Shiny app for exploring the NICAR 2026 data journalism conference schedule. It features a chatbot that answers natural language questions about the schedule, as well as a searchable table with that info.
 
-Anthropic's Claude wrote much of the Shiny app code. The ragnar data processing portion was written by me in partnership with Claude, and improved by ragnar package author Tomasz Kalinowski. For more on this, check out my InfoWorld article [How to create your own RAG applications in R](https://www.infoworld.com/article/4020484/generative-ai-rag-comes-to-the-r-tidyverse.html) and my [Workshop for Ukraine ($20 donation)](https://sites.google.com/view/dariia-mykhailyshyna/main/r-workshops-for-ukraine#h.nxnvhskykjzg)
+This year's NICAR (National Institute for Computer-Assisted Reporting) conference takes place March 5-8 in Indianapolis.
 
-Most of the docs below were written by Claude:
+Anthropic's Claude wrote much of the Shiny app code. The rest was written by me in partnership with Claude, and improved by ragnar package author Tomasz Kalinowski. For more on this, check out my InfoWorld article [How to create your own RAG applications in R](https://www.infoworld.com/article/4020484/generative-ai-rag-comes-to-the-r-tidyverse.html) and my [Workshop for Ukraine ($20 donation)](https://sites.google.com/view/dariia-mykhailyshyna/main/r-workshops-for-ukraine#h.nxnvhskykjzg)
+
+The documentation below was written by Claude and lightly edited by me:
 
 ## Features
 
@@ -34,7 +36,7 @@ pak::pak("posit-dev/ragnar")
 ### API Key
 You need a Google Gemini API key for the chat functionality if you run this locally. If you want to generate the ragnar data store, you'll also need an OpenAI key for the text embeddings. 
 
-Note that Google has a pretty generous free tier for its Gemini 3 Flash Preview LLM used in the chatbot. Set your key as an environment variable:
+Google has a free tier for its Gemini 2.5 Flash LLM used in the chatbot, so you can try it out locally for free. Set your key as an environment variable:
 
 ```r
 # Option 1: Set in .Renviron file
@@ -46,10 +48,12 @@ Sys.setenv(GEMINI_API_KEY = "-your-key-here")
 
 If no key is set, the app should prompt you to enter one at startup.
 
+If you want to generate the data store from scratch, you'll also need an OpenAI API key for the embeddings.
+
 ## Setup
 
 ### 1. Build the Data Store
-Run the data processing script to download session data and create the ragnar vector store:
+If you don't want to use the existing data in this repo, you can run the data processing script to download session data and create the ragnar vector store:
 
 ```r
 source("01_get_and_process_data.R")
@@ -84,21 +88,20 @@ Or in RStudio, open `app.R` and click "Run App".
 Ask questions like:
 - "What sessions are about data visualization?"
 - "Are there any Python sessions on Friday afternoon?"
-- "What sessions is Simon Willison presenting?"
+- "What sessions is Simon Willison leading?"
 - "Show me beginner-level hands-on sessions"
 
 ### Filter Button
 After the AI finds sessions, a green **"Show These X Sessions in Table"** button appears. Click it to filter the table to just those sessions. A yellow **"Show All Sessions"** button lets you clear the filter.
 
 ### Table
-- **Search**: Use the search box to filter across all columns
-- **Sort**: Click column headers to sort
+- **Search**: Use the search box to filter across all columns (regular expressions are supported in the global search but not the column filter boxes)
 - **Expand**: Click the triangle to see full session details
 - **Columns**: Session Title, Day, Time, Speakers, Room, Skill Level, Track
 
 ## How It Works
 
-1. **Data Processing**: Session data is downloaded from AWS S3, processed into markdown, and embedded using OpenAI's text-embedding-3-small model via ragnar.
+1. **Data Processing**: Session data is downloaded from the [conference website](https://schedules.ire.org/nicar-2026/), processed into markdown, and embedded using OpenAI's text-embedding-3-small model via the ragnar R package.
 
 2. **RAG Search**: The app uses ragnar's search capabilities:
    - Vector Similarity Search (VSS) for semantic matching

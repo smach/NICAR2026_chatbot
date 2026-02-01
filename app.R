@@ -13,6 +13,7 @@ library(lubridate)
 library(DBI)
 source("helpers_ui.R")
 source("helpers_server.R")
+source("helpers_logging.R")
 
 # Load environment variables
 if (file.exists(".Renviron")) {
@@ -31,7 +32,7 @@ ui <- page_fillable(
 
   layout_sidebar(
     sidebar = sidebar(
-      width = "33%",
+      width = "40%",
       title = div(
         "🤖 NICAR 2026 Conference Assistant",
         style = "color: #2B4C5E; font-weight: 600;"
@@ -52,7 +53,7 @@ ui <- page_fillable(
         ),
         actionButton(
           "ask_thursday",
-          "📊 Are there any generative AI sessions happening Thursday?",
+          "📊 Are there any generative AI sessions happening Thursday morning?",
           class = "btn-sample-questions"
         ),
         actionButton(
@@ -311,10 +312,10 @@ server <- function(input, output, session) {
       showModal(modalDialog(
         title = "Geminiedit API Key Required",
         p(
-          "This app uses Google's Gemini 3 Flash Preview to answer questions about NICAR 2026 sessions."
+          "This app uses Google's Gemini 2.5 Flash to answer questions about NICAR 2026 sessions."
         ),
         p(
-          "Please enter your own Google Gemini API key to use the chat feature. There is a pretty generous free tier"
+          "Please enter your own Google Gemini API key to use the chat feature. There is a free tier"
         ),
         p(tags$a(
           "Get an API key in Google's AI Studio",
@@ -437,7 +438,7 @@ server <- function(input, output, session) {
         )
 
         # Create chat ====
-        # Using gpt-5.1
+        # OpenAI gpt-5.1 didn't work very well
         # chat <- chat_openai(
         #   system_prompt = system_prompt,
         #   model = "gpt-5.1",
@@ -445,6 +446,7 @@ server <- function(input, output, session) {
         #   echo = "none"
         # )
 
+        # Anthropic LLMs good but a bit pricey
         # chat <- chat_anthropic(
         #   system_prompt = system_prompt,
         #   model = "claude-sonnet-4-5-20250929",
@@ -453,7 +455,8 @@ server <- function(input, output, session) {
 
         chat <- chat_google_gemini(
           system_prompt = system_prompt,
-          model = "gemini-3-flash-preview",
+          # model = "gemini-3-flash-preview",
+          model = "gemini-2.5-flash",
           echo = "none"
         )
 
@@ -520,7 +523,7 @@ server <- function(input, output, session) {
   observeEvent(input$ask_thursday, {
     ai_session_titles(NULL)
     handle_question_button(
-      "Are there any generative AI sessions happening Thursday?",
+      "Are there any generative AI sessions happening Thursday morning?",
       chat_obj
     )
   })
@@ -555,6 +558,18 @@ server <- function(input, output, session) {
       {
         response_stream <- chat$stream_async(user_input)
         chat_append("session_chat", response_stream) %>%
+          then(function(result) {
+            # Log token usage after stream completes
+            usage <- extract_last_turn_usage(chat)
+            if (!is.null(usage)) {
+              log_api_usage(
+                input_tokens = usage$input_tokens,
+                output_tokens = usage$output_tokens,
+                # model = "gemini-3-flash-preview"
+                model = "gemini-2.5-flash"
+              )
+            }
+          }) %>%
           catch(function(error) {
             chat_append(
               "session_chat",
@@ -651,61 +666,45 @@ server <- function(input, output, session) {
         Title = colDef(
           name = "Session Title",
           minWidth = 280,
-          style = list(fontWeight = "600", color = "#2B4C5E"),
-          cell = function(value) {
-            div(style = "white-space: normal; line-height: 1.4;", value)
-          }
+          class = "cell-title"
         ),
         # Day column with color coding (not sortable - would sort alphabetically)
         Day = colDef(
           name = "Day",
           width = 90,
           sortable = FALSE,
-          style = function(value) {
-            if (value == "Thursday") {
-              list(color = "#8FB339", fontWeight = "600")
-            } else if (value == "Friday") {
-              list(color = "#F5B800", fontWeight = "600")
-            } else if (value == "Saturday") {
-              list(color = "#4A90D9", fontWeight = "600")
-            } else {
-              list(color = "#9B59B6", fontWeight = "600")
-            }
-          }
+          class = function(value) paste0("day-", tolower(value))
         ),
         # Time column (not sortable - would sort as text incorrectly)
         Time = colDef(
           name = "Time",
           width = 85,
           sortable = FALSE,
-          style = list(fontSize = "14px")
+          class = "cell-time"
         ),
         # Speakers column - now visible for easy scanning
         Speakers = colDef(
           name = "Speakers",
           minWidth = 180,
-          style = list(fontSize = "13px", color = "#555"),
-          cell = function(value) {
-            div(style = "white-space: normal; line-height: 1.3;", value)
-          }
+          class = "cell-speakers"
         ),
         # Room location
         Room = colDef(
           name = "Room",
           width = 100,
-          style = list(fontSize = "14px", color = "#666")
+          class = "cell-room"
         ),
         # Skill level (Beginner, Intermediate, Advanced)
         SkillLevel = colDef(
           name = "Skill Level",
           width = 100,
-          style = list(fontSize = "13px", color = "#666")
+          class = "cell-skill"
         ),
         # Track/category
         Track = colDef(
           name = "Track",
           width = 150,
-          style = list(color = "#666")
+          class = "cell-track"
         ),
         # Hidden but searchable columns
         Description = colDef(show = FALSE, searchable = TRUE),

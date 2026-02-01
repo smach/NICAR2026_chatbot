@@ -261,3 +261,41 @@ Defines:
 -   **Two-Tool Pattern**: Separates search (finding sessions) from highlighting (enabling table filter)
 
 This architecture aims to create a powerful, user-friendly interface for conference attendees to discover relevant sessions through natural language queries while maintaining the ability to browse and filter all sessions.
+
+## Token Usage Logging
+
+The app tracks API usage and costs for monitoring and budgeting purposes. _It does not store any query or user data._
+
+### Logging Infrastructure (`helpers_logging.R`)
+
+- **Pricing**: Configured for gemini-2.5-flash ($0.30/M input, $2.50/M output)
+- **Log Location**:
+  - Posit Connect Cloud: Uses `CONNECT_DATA_DIR` environment variable
+  - Local: `logs/` subdirectory
+- **Log Format**: CSV with timestamp, date, model, tokens, and costs
+
+### Key Functions
+
+- `log_api_usage()`: Records each API call for token counts and costs
+- `calculate_cost()`: Computes cost from token counts
+- `extract_last_turn_usage()`: Gets token usage from ellmer chat object
+- `get_daily_summary()`: Returns aggregated stats for a date (for local testing)
+
+### Accessing Logs on Posit Connect Cloud
+
+The CSV is stored in the persistent data directory (`CONNECT_DATA_DIR`). To download:
+1. Go to your app in Posit Connect Cloud dashboard
+2. Click "Data" or "Files" in the app settings
+3. Download `api_usage.csv`
+4. Open in Excel/R to review daily/monthly totals
+
+The CSV columns are: `timestamp`, `date`, `model`, `input_tokens`, `output_tokens`, `input_cost`, `output_cost`, `total_cost`
+
+To get daily/monthly summaries locally after downloading:
+```r
+logs <- read.csv("api_usage.csv")
+logs |>
+  dplyr::mutate(date = as.Date(date)) |>
+  dplyr::group_by(date) |>
+  dplyr::summarise(requests = n(), total_cost = sum(total_cost))
+```

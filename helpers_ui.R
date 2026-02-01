@@ -170,6 +170,21 @@ custom_style <- HTML(
         color: #2B4C5E !important;
         font-weight: 600 !important;
       }
+
+      /* ---------- REACTABLE CELL STYLES ---------- */
+      /* Day column color classes */
+      .day-thursday { color: #8FB339; font-weight: 600; }
+      .day-friday { color: #F5B800; font-weight: 600; }
+      .day-saturday { color: #4A90D9; font-weight: 600; }
+      .day-sunday { color: #9B59B6; font-weight: 600; }
+
+      /* Other pre-computed cell styles */
+      .cell-title { font-weight: 600; color: #2B4C5E; white-space: normal; line-height: 1.4; }
+      .cell-speakers { font-size: 13px; color: #555; white-space: normal; line-height: 1.3; }
+      .cell-room { font-size: 14px; color: #666; }
+      .cell-skill { font-size: 13px; color: #666; }
+      .cell-track { color: #666; }
+      .cell-time { font-size: 14px; }
       
       /* ---------- CHAT INPUT ---------- */
       .shiny-input-container input[type='text'] {
