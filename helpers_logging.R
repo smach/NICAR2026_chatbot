@@ -43,12 +43,14 @@ get_log_dir <- function() {
 #' @param input_tokens Number of input tokens
 #' @param output_tokens Number of output tokens
 #' @param model Model name
+#' @param key_source Source of API key: "app_key" (environment) or "user_key" (user-provided)
 #' @param timestamp Timestamp of the API call
 #' @return Invisibly returns the log entry data frame
 log_api_usage <- function(
   input_tokens,
   output_tokens,
   model,
+  key_source = "app_key",
   timestamp = Sys.time()
 ) {
   cost <- calculate_cost(input_tokens, output_tokens, model)
@@ -57,6 +59,7 @@ log_api_usage <- function(
     timestamp = format(timestamp, "%Y-%m-%d %H:%M:%S"),
     date = as.character(as.Date(timestamp)),
     model = model,
+    key_source = key_source,
     input_tokens = input_tokens,
     output_tokens = output_tokens,
     input_cost = cost$input_cost,

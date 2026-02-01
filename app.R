@@ -305,12 +305,15 @@ server <- function(input, output, session) {
   # Store user-provided API key
   user_api_key <- reactiveVal(NULL)
 
+  # Track whether using app key (from environment) or user-provided key
+  key_source <- reactiveVal("app_key")
+
   # Show API key modal on startup if no key in environment
   observe({
     env_key <- Sys.getenv("GEMINI_API_KEY")
     if (env_key == "" && is.null(user_api_key())) {
       showModal(modalDialog(
-        title = "Geminiedit API Key Required",
+        title = "Gemini API Key Required",
         p(
           "This app uses Google's Gemini 2.5 Flash to answer questions about NICAR 2026 sessions."
         ),
@@ -346,6 +349,7 @@ server <- function(input, output, session) {
     key <- input$api_key_input
     if (nchar(key) > 20) {
       user_api_key(key)
+      key_source("user_key")
       removeModal()
     } else {
       showNotification(
@@ -357,7 +361,7 @@ server <- function(input, output, session) {
 
   # Get the active API key (environment or user-provided)
   active_api_key <- reactive({
-    env_key <- Sys.getenv("OPENAI_API_KEY")
+    env_key <- Sys.getenv("GEMINI_API_KEY")
     if (env_key != "") {
       return(env_key)
     }
@@ -372,7 +376,7 @@ server <- function(input, output, session) {
     }
 
     # Set the API key for this session
-    Sys.setenv(OPENAI_API_KEY = api_key)
+    Sys.setenv(GEMINI_API_KEY = api_key)
 
     tryCatch(
       {
@@ -565,8 +569,8 @@ server <- function(input, output, session) {
               log_api_usage(
                 input_tokens = usage$input_tokens,
                 output_tokens = usage$output_tokens,
-                # model = "gemini-3-flash-preview"
-                model = "gemini-2.5-flash"
+                model = "gemini-2.5-flash",
+                key_source = key_source()
               )
             }
           }) %>%

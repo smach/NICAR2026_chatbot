@@ -1,5 +1,14 @@
 header_content <- div(
   class = "header-content",
+  # GitHub link in top-right corner
+  a(
+    href = "https://github.com/smach/NICAR2026_chatbot",
+    target = "_blank",
+    title = "View source on GitHub",
+    class = "github-link",
+    icon("github", lib = "font-awesome"),
+    style = "position: absolute; top: 15px; right: 20px; color: #ffffff; font-size: 24px; opacity: 0.8; transition: opacity 0.2s;"
+  ),
   h1(
     "NICAR 2026 Session Explorer",
     style = "margin: 0; font-weight: 300; font-size: 2.5rem;"
@@ -36,6 +45,12 @@ custom_style <- HTML(
         padding: 20px;
         margin: -15px -15px 15px -15px;
         text-align: center;        /* <-- centering */
+        position: relative;        /* for GitHub icon positioning */
+      }
+
+      .github-link:hover {
+        opacity: 1 !important;
+        color: #F5B800 !important;
       }
 
       /* If the .header-content wrapper is still used, keep it centered too */
