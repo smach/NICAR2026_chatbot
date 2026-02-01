@@ -33,6 +33,7 @@ ui <- page_fillable(
   layout_sidebar(
     sidebar = sidebar(
       width = "40%",
+      open = "open",
       title = div(
         "🤖 NICAR 2026 Conference Assistant",
         style = "color: #2B4C5E; font-weight: 600;"
