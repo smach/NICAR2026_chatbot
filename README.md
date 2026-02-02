@@ -1,6 +1,6 @@
 # NICAR 2026 Session Explorer
 
-This repo features an R Shiny app for exploring the NICAR 2026 data journalism conference schedule. It features a chatbot that answers natural language questions about the schedule, as well as a searchable table with that info.
+This repo contains code for an R Shiny app for exploring the NICAR 2026 data journalism conference schedule. It features a chatbot that answers natural language questions about the schedule, as well as a searchable table with that info.
 
 This year's NICAR (National Institute for Computer-Assisted Reporting) conference takes place March 5-8 in Indianapolis.
 
