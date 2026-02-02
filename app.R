@@ -252,9 +252,12 @@ server <- function(input, output, session) {
     ragnar_retrieve_bm25(
       store,
       speaker_name,
-      top_k = top_k,
+      top_k = top_k * 2, # Retrieve more to account for filtering
       conjunctive = FALSE # Allow partial matches for flexibility
     ) |>
+      # Filter to only include sessions where the speaker name appears in Speakers field
+      filter(grepl(speaker_name, Speakers, ignore.case = TRUE)) |>
+      head(top_k) |>
       select(
         Title,
         Date,
