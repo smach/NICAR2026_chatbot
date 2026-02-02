@@ -74,18 +74,39 @@ upstash_command <- function(command) {
 #' @param total_cost Total cost for this request
 #' @return TRUE if successful, FALSE otherwise
 log_to_upstash <- function(input_tokens, output_tokens, total_cost) {
-  if (!upstash_configured()) return(FALSE)
+  message("[LOGGING] log_to_upstash called")
+  message("[LOGGING] UPSTASH_URL set: ", nzchar(Sys.getenv("UPSTASH_URL")))
+  message("[LOGGING] UPSTASH_TOKEN set: ", nzchar(Sys.getenv("UPSTASH_TOKEN")))
+  message("[LOGGING] upstash_configured() = ", upstash_configured())
+
+  if (!upstash_configured()) {
+    message("[LOGGING] Upstash not configured, skipping")
+    return(FALSE)
+  }
 
   # Use a pipeline to run multiple commands atomically
   # Increment: total_requests, total_input_tokens, total_output_tokens, total_cost
   tryCatch({
-    upstash_command(c("INCR", "nicar:total_requests"))
-    upstash_command(c("INCRBYFLOAT", "nicar:total_input_tokens", as.character(input_tokens)))
-    upstash_command(c("INCRBYFLOAT", "nicar:total_output_tokens", as.character(output_tokens)))
-    upstash_command(c("INCRBYFLOAT", "nicar:total_cost", as.character(total_cost)))
+    message("[LOGGING] Sending INCR nicar:total_requests")
+    r1 <- upstash_command(c("INCR", "nicar:total_requests"))
+    message("[LOGGING] Result: ", r1)
+
+    message("[LOGGING] Sending INCRBYFLOAT nicar:total_input_tokens ", input_tokens)
+    r2 <- upstash_command(c("INCRBYFLOAT", "nicar:total_input_tokens", as.character(input_tokens)))
+    message("[LOGGING] Result: ", r2)
+
+    message("[LOGGING] Sending INCRBYFLOAT nicar:total_output_tokens ", output_tokens)
+    r3 <- upstash_command(c("INCRBYFLOAT", "nicar:total_output_tokens", as.character(output_tokens)))
+    message("[LOGGING] Result: ", r3)
+
+    message("[LOGGING] Sending INCRBYFLOAT nicar:total_cost ", total_cost)
+    r4 <- upstash_command(c("INCRBYFLOAT", "nicar:total_cost", as.character(total_cost)))
+    message("[LOGGING] Result: ", r4)
+
+    message("[LOGGING] Upstash logging complete")
     TRUE
   }, error = function(e) {
-    message("Upstash logging error: ", e$message)
+    message("[LOGGING] Upstash logging error: ", e$message)
     FALSE
   })
 }
@@ -155,8 +176,14 @@ log_api_usage <- function(
   key_source = "app_key",
   timestamp = Sys.time()
 ) {
+  # Debug: log that we're attempting to log
+  message("[LOGGING] log_api_usage called with ", input_tokens, " input, ", output_tokens, " output tokens")
+  message("[LOGGING] NICAR_CHATBOT_LOG_USAGE = '", Sys.getenv("NICAR_CHATBOT_LOG_USAGE", ""), "'")
+  message("[LOGGING] logging_enabled() = ", logging_enabled())
+
   # Skip logging if disabled
  if (!logging_enabled()) {
+    message("[LOGGING] Logging disabled, skipping")
     return(invisible(NULL))
  }
 
