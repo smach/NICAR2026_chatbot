@@ -80,7 +80,7 @@ ui <- page_fillable(
           )
         ),
         placeholder = "Ask about conference sessions...",
-        height = "calc(100vh - 320px)"
+        height = "calc(100vh - 350px)"
       )
     ),
 
@@ -111,8 +111,24 @@ ui <- page_fillable(
           )
         )
       ),
-      reactableOutput("session_table", height = "calc(100vh - 300px)")
+      reactableOutput("session_table", height = "calc(100vh - 330px)")
     )
+  ),
+
+
+  # Minimal footer credit
+  tags$footer(
+    style = "
+      position: fixed;
+      bottom: 2px;
+      right: 12px;
+      font-size: 11px;
+      color: #999;
+      background: white;
+      padding: 4px 8px;
+      border-radius: 3px;
+    ",
+    HTML("App by <a href='https://machlis.com' target='_blank' style='color: #888;'>Sharon Machlis</a> & Claude AI")
   )
 )
 
