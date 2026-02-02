@@ -420,48 +420,66 @@ get_daily_summary <- function(date = Sys.Date()) {
   )
 }
 
-#' Extract token usage from the last assistant turn in an ellmer chat object
+#' Get cumulative token totals from a chat object
+#'
+#' Uses ellmer's Chat$get_tokens() method which returns a data frame with
+#' one row per assistant turn. This function sums ALL rows to get cumulative totals.
+#'
 #' @param chat An ellmer chat object
-#' @return List with input_tokens and output_tokens, or NULL if unavailable
-extract_last_turn_usage <- function(chat) {
-  turns <- chat$get_turns()
-  if (length(turns) == 0) {
-    return(NULL)
-  }
-
-  # Find the index of the last user turn
-  last_user_idx <- 0
-  for (i in seq_along(turns)) {
-    role <- tryCatch(turns[[i]]@role, error = function(e) "")
-    if (role == "user") last_user_idx <- i
-  }
-
-  if (last_user_idx == 0 || last_user_idx >= length(turns)) {
-    return(NULL)
-  }
-
-  # Sum all assistant turns AFTER the last user turn
-  # (These are all the turns generated in response to the latest query)
-  total_input <- 0
-  total_output <- 0
-
-  for (i in (last_user_idx + 1):length(turns)) {
-    role <- tryCatch(turns[[i]]@role, error = function(e) "")
-    if (role == "assistant") {
-      tokens <- turns[[i]]@tokens
-      if (!any(is.na(tokens))) {
-        total_input <- total_input + tokens[1] + tokens[3] # uncached + cached
-        total_output <- total_output + tokens[2]
-      }
+#' @return List with cumulative input_tokens, output_tokens, and row_count
+get_cumulative_tokens <- function(chat) {
+  tokens_df <- tryCatch(
+    chat$get_tokens(),
+    error = function(e) {
+      message("[LOGGING] Error calling get_tokens(): ", e$message)
+      NULL
     }
+  )
+
+  if (is.null(tokens_df) || nrow(tokens_df) == 0) {
+    return(list(input_tokens = 0, output_tokens = 0, row_count = 0))
   }
 
-  if (total_input == 0 && total_output == 0) {
+  # Sum ALL rows - each row is an assistant turn (including tool call responses)
+  # Use na.rm = TRUE to handle any NA values gracefully
+  list(
+    input_tokens = sum(tokens_df$input, na.rm = TRUE) +
+                   sum(tokens_df$cached_input, na.rm = TRUE),
+    output_tokens = sum(tokens_df$output, na.rm = TRUE),
+    row_count = nrow(tokens_df)
+  )
+}
+
+#' Calculate token usage for the most recent interaction
+#'
+#' Compares current cumulative totals against previous totals to determine
+#' how many tokens were used in the latest query. This approach guarantees
+#' ALL tokens are captured, including those from multiple tool calls.
+#'
+#' @param chat An ellmer chat object
+#' @param prev_totals List with previous cumulative totals from get_cumulative_tokens()
+#' @return List with input_tokens and output_tokens for this interaction, or NULL
+calculate_interaction_tokens <- function(chat, prev_totals) {
+  current_totals <- get_cumulative_tokens(chat)
+
+  # Calculate tokens used in this interaction
+  input_used <- current_totals$input_tokens - prev_totals$input_tokens
+  output_used <- current_totals$output_tokens - prev_totals$output_tokens
+  turns_added <- current_totals$row_count - prev_totals$row_count
+
+  message("[LOGGING] Token calculation:")
+  message("[LOGGING]   Previous: ", prev_totals$input_tokens, " input, ",
+          prev_totals$output_tokens, " output (", prev_totals$row_count, " turns)")
+  message("[LOGGING]   Current:  ", current_totals$input_tokens, " input, ",
+          current_totals$output_tokens, " output (", current_totals$row_count, " turns)")
+  message("[LOGGING]   This query: ", input_used, " input, ", output_used, " output (",
+          turns_added, " turns added)")
+
+  # Only return usage if tokens were actually used
+  if (input_used == 0 && output_used == 0) {
+    message("[LOGGING] No tokens used in this interaction")
     return(NULL)
   }
 
-  list(
-    input_tokens = total_input,
-    output_tokens = total_output
-  )
+  list(input_tokens = input_used, output_tokens = output_used)
 }

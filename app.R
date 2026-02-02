@@ -589,13 +589,22 @@ server <- function(input, output, session) {
 
     user_input <- input$session_chat_user_input
 
+    # CRITICAL: Capture token totals BEFORE the query starts
+    # This allows us to calculate exactly how many tokens this query used
+    prev_totals <- get_cumulative_tokens(chat)
+    message("[LOGGING] Starting query. Previous totals: ",
+            prev_totals$input_tokens, " input, ",
+            prev_totals$output_tokens, " output")
+
     tryCatch(
       {
         response_stream <- chat$stream_async(user_input)
         chat_append("session_chat", response_stream) %>%
           then(function(result) {
-            # Log token usage after stream completes
-            usage <- extract_last_turn_usage(chat)
+            # After stream completes, calculate tokens used for THIS query
+            # by comparing current totals to previous totals.
+            # This captures ALL tokens from ALL assistant turns (including tool calls)
+            usage <- calculate_interaction_tokens(chat, prev_totals)
             if (!is.null(usage)) {
               log_api_usage(
                 input_tokens = usage$input_tokens,
