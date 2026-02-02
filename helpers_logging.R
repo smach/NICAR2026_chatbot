@@ -68,7 +68,7 @@ upstash_command <- function(command) {
   })
 }
 
-#' Log usage to Upstash Redis (increments running totals)
+#' Log usage to Upstash Redis (increments running totals AND daily totals)
 #' @param input_tokens Number of input tokens
 #' @param output_tokens Number of output tokens
 #' @param total_cost Total cost for this request
@@ -84,24 +84,24 @@ log_to_upstash <- function(input_tokens, output_tokens, total_cost) {
     return(FALSE)
   }
 
-  # Use a pipeline to run multiple commands atomically
-  # Increment: total_requests, total_input_tokens, total_output_tokens, total_cost
+  # Get today's date for daily keys
+ today <- format(Sys.Date(), "%Y-%m-%d")
+
   tryCatch({
-    message("[LOGGING] Sending INCR nicar:total_requests")
-    r1 <- upstash_command(c("INCR", "nicar:total_requests"))
-    message("[LOGGING] Result: ", r1)
+    # Running totals (all-time)
+    message("[LOGGING] Updating running totals...")
+    upstash_command(c("INCR", "nicar:total_requests"))
+    upstash_command(c("INCRBYFLOAT", "nicar:total_input_tokens", as.character(input_tokens)))
+    upstash_command(c("INCRBYFLOAT", "nicar:total_output_tokens", as.character(output_tokens)))
+    upstash_command(c("INCRBYFLOAT", "nicar:total_cost", as.character(total_cost)))
 
-    message("[LOGGING] Sending INCRBYFLOAT nicar:total_input_tokens ", input_tokens)
-    r2 <- upstash_command(c("INCRBYFLOAT", "nicar:total_input_tokens", as.character(input_tokens)))
-    message("[LOGGING] Result: ", r2)
+    # Daily totals (for tracking by day)
+    message("[LOGGING] Updating daily totals for ", today)
+    upstash_command(c("INCR", paste0("nicar:daily:", today, ":requests")))
+    upstash_command(c("INCRBYFLOAT", paste0("nicar:daily:", today, ":cost"), as.character(total_cost)))
 
-    message("[LOGGING] Sending INCRBYFLOAT nicar:total_output_tokens ", output_tokens)
-    r3 <- upstash_command(c("INCRBYFLOAT", "nicar:total_output_tokens", as.character(output_tokens)))
-    message("[LOGGING] Result: ", r3)
-
-    message("[LOGGING] Sending INCRBYFLOAT nicar:total_cost ", total_cost)
-    r4 <- upstash_command(c("INCRBYFLOAT", "nicar:total_cost", as.character(total_cost)))
-    message("[LOGGING] Result: ", r4)
+    # Track which days have data (for listing)
+    upstash_command(c("SADD", "nicar:days", today))
 
     message("[LOGGING] Upstash logging complete")
     TRUE
@@ -133,15 +133,70 @@ get_upstash_totals <- function() {
   )
 }
 
+#' Get daily usage stats from Upstash
+#' @param date Optional date (defaults to today). Use "all" to get all days.
+#' @return Data frame with date, requests, and cost
+get_upstash_daily <- function(date = NULL) {
+ if (!upstash_configured()) {
+    return(data.frame(date = character(), requests = integer(), cost = numeric()))
+ }
+
+ if (is.null(date)) {
+    date <- format(Sys.Date(), "%Y-%m-%d")
+ }
+
+ if (date == "all") {
+    # Get all days that have data
+    days <- upstash_command(c("SMEMBERS", "nicar:days"))
+    if (is.null(days) || length(days) == 0) {
+      return(data.frame(date = character(), requests = integer(), cost = numeric()))
+    }
+    # Sort days
+    days <- sort(unlist(days))
+
+    # Get stats for each day
+    results <- lapply(days, function(d) {
+      data.frame(
+        date = d,
+        requests = as.integer(upstash_command(c("GET", paste0("nicar:daily:", d, ":requests"))) %||% 0),
+        cost = as.numeric(upstash_command(c("GET", paste0("nicar:daily:", d, ":cost"))) %||% 0)
+      )
+    })
+    do.call(rbind, results)
+ } else {
+    # Get stats for specific date
+    data.frame(
+      date = date,
+      requests = as.integer(upstash_command(c("GET", paste0("nicar:daily:", date, ":requests"))) %||% 0),
+      cost = as.numeric(upstash_command(c("GET", paste0("nicar:daily:", date, ":cost"))) %||% 0)
+    )
+ }
+}
+
 #' Reset Upstash counters (use with caution!)
+#' @param daily_too If TRUE, also deletes daily stats. Default FALSE.
 #' @return TRUE if successful
-reset_upstash_totals <- function() {
+reset_upstash_totals <- function(daily_too = FALSE) {
   if (!upstash_configured()) return(FALSE)
 
+  # Reset running totals
   upstash_command(c("SET", "nicar:total_requests", "0"))
   upstash_command(c("SET", "nicar:total_input_tokens", "0"))
   upstash_command(c("SET", "nicar:total_output_tokens", "0"))
   upstash_command(c("SET", "nicar:total_cost", "0"))
+
+  if (daily_too) {
+    # Get all days and delete their keys
+    days <- upstash_command(c("SMEMBERS", "nicar:days"))
+    if (!is.null(days) && length(days) > 0) {
+      for (d in days) {
+        upstash_command(c("DEL", paste0("nicar:daily:", d, ":requests")))
+        upstash_command(c("DEL", paste0("nicar:daily:", d, ":cost")))
+      }
+    }
+    upstash_command(c("DEL", "nicar:days"))
+  }
+
   TRUE
 }
 
