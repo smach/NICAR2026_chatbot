@@ -74,7 +74,9 @@ Or in RStudio, open `app.R` and click "Run App".
 
 The app has optional API usage logging for cost monitoring, but **logging is disabled by default**. If `NICAR_CHATBOT_LOG_USAGE` isn't in your environment, logging is simply skipped - you don't need to set anything and the app won't error.
 
-If you want to enable logging (e.g., for your own deployment), set `NICAR_CHATBOT_LOG_USAGE=TRUE` in your `.Renviron` file. See `claude_explains_shiny_app.md` for details.
+If you want to enable logging (e.g., for your own deployment), set `NICAR_CHATBOT_LOG_USAGE=TRUE` in your `.Renviron` file. See [logging.md](logging.md) for full setup instructions including cloud deployment with Supabase.
+
+**Only token usage and calculated costs are logged.* No information about queries, users, user API addresses, or API keys (if the app is set up to ask people to enter their own keys) is EVER saved.
 
 ## File Structure
 
@@ -124,8 +126,8 @@ After the AI finds sessions, a green **"Show These X Sessions in Table"** button
 
 - **Conference**: [NICAR 2026](https://www.ire.org/training/conferences/nicar-2026/) by IRE (Investigative Reporters and Editors)
 - **Packages**: [shinychat](https://github.com/posit-dev/shinychat), [ellmer](https://github.com/posit-dev/ellmer), [ragnar](https://github.com/posit-dev/ragnar) by Posit
-- **AI**: Google Gemini for chat, OpenAI text-embedding-3-small for embeddings
+- **AI**: Google Gemini for chat, OpenAI text-embedding-3-small for embeddings, Claude for writing much of the code, Sharon Machlis for being the project manager, editor, and code reviewer 😅
 
 ## Disclaimer
 
-This is an **unofficial** app. AI can make mistakes - always verify session details on the [official NICAR schedule](https://schedules.ire.org/nicar-2026/).
+This is an **unofficial** app. AI can make mistakes - and the schedule may have last-minute changes. Always verify session details on the [official NICAR schedule](https://schedules.ire.org/nicar-2026/).

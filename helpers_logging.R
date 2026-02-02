@@ -1,6 +1,6 @@
 # helpers_logging.R
 # Token usage logging and cost tracking for Gemini API
-# Supports both local CSV logging and Upstash Redis for cloud deployment
+# Supports both local CSV logging and Supabase PostgreSQL for cloud deployment
 #
 # To disable logging, set NICAR_CHATBOT_LOG_USAGE=false in your environment or .Renviron
 # Logging is disabled by default for local development
@@ -38,83 +38,172 @@ calculate_cost <- function(
   )
 }
 
-# ==== UPSTASH REDIS FUNCTIONS ====
+# ==== SUPABASE POSTGRESQL FUNCTIONS ====
 
-#' Check if Upstash is configured
-#' @return TRUE if UPSTASH_URL and UPSTASH_TOKEN are set
-upstash_configured <- function() {
-  nzchar(Sys.getenv("UPSTASH_URL")) && nzchar(Sys.getenv("UPSTASH_TOKEN"))
+#' Check if Supabase is configured
+#' @return TRUE if SUPABASE_URL and SUPABASE_KEY are set
+supabase_configured <- function() {
+  nzchar(Sys.getenv("SUPABASE_URL")) && nzchar(Sys.getenv("SUPABASE_KEY"))
 }
 
-#' Execute an Upstash Redis command
-#' @param command Vector of command parts (e.g., c("INCRBYFLOAT", "key", "1.5"))
+#' Execute a Supabase REST API request
+#' @param endpoint API endpoint (e.g., "/rest/v1/api_usage")
+#' @param method HTTP method (GET, POST, etc.)
+#' @param body Optional request body (list that will be converted to JSON)
+#' @param query Optional query parameters (list)
 #' @return Parsed response or NULL on error
-upstash_command <- function(command) {
-  if (!upstash_configured()) return(NULL)
+supabase_request <- function(endpoint, method = "GET", body = NULL, query = NULL) {
+  if (!supabase_configured()) return(NULL)
 
-  url <- Sys.getenv("UPSTASH_URL")
-  token <- Sys.getenv("UPSTASH_TOKEN")
+  url <- Sys.getenv("SUPABASE_URL")
+  key <- Sys.getenv("SUPABASE_KEY")
 
   tryCatch({
-    resp <- httr2::request(url) |>
-      httr2::req_headers(Authorization = paste("Bearer", token)) |>
-      httr2::req_body_json(command) |>
-      httr2::req_perform() |>
-      httr2::resp_body_json()
-    resp$result
+    req <- httr2::request(paste0(url, endpoint)) |>
+      httr2::req_method(method) |>
+      httr2::req_headers(
+        apikey = key,
+        Authorization = paste("Bearer", key),
+        `Content-Type` = "application/json",
+        Prefer = "return=minimal"
+      )
+
+    if (!is.null(query)) {
+      req <- httr2::req_url_query(req, !!!query)
+    }
+
+    if (!is.null(body)) {
+      req <- httr2::req_body_json(req, body)
+    }
+
+    resp <- httr2::req_perform(req)
+
+    # For POST with return=minimal, there's no body to parse
+    if (method == "POST") {
+      return(TRUE)
+    }
+
+    httr2::resp_body_json(resp)
   }, error = function(e) {
-    message("Upstash error: ", e$message)
+    message("Supabase error: ", e$message)
     NULL
   })
 }
 
-#' Log usage to Upstash Redis (increments running totals AND daily totals)
+#' Log usage to Supabase (inserts a row into api_usage table)
+#' @param timestamp Timestamp of the request
+#' @param date Date of the request
+#' @param model Model name
+#' @param key_source Source of API key ("app_key" or "user_key")
 #' @param input_tokens Number of input tokens
 #' @param output_tokens Number of output tokens
+#' @param input_cost Cost for input tokens
+#' @param output_cost Cost for output tokens
 #' @param total_cost Total cost for this request
 #' @return TRUE if successful, FALSE otherwise
-log_to_upstash <- function(input_tokens, output_tokens, total_cost) {
-  message("[LOGGING] log_to_upstash called")
-  message("[LOGGING] UPSTASH_URL set: ", nzchar(Sys.getenv("UPSTASH_URL")))
-  message("[LOGGING] UPSTASH_TOKEN set: ", nzchar(Sys.getenv("UPSTASH_TOKEN")))
-  message("[LOGGING] upstash_configured() = ", upstash_configured())
+log_to_supabase <- function(timestamp, date, model, key_source,
+                            input_tokens, output_tokens,
+                            input_cost, output_cost, total_cost) {
+  message("[LOGGING] log_to_supabase called")
+  message("[LOGGING] SUPABASE_URL set: ", nzchar(Sys.getenv("SUPABASE_URL")))
+  message("[LOGGING] SUPABASE_KEY set: ", nzchar(Sys.getenv("SUPABASE_KEY")))
+  message("[LOGGING] supabase_configured() = ", supabase_configured())
 
-  if (!upstash_configured()) {
-    message("[LOGGING] Upstash not configured, skipping")
+  if (!supabase_configured()) {
+    message("[LOGGING] Supabase not configured, skipping")
     return(FALSE)
   }
 
-  # Get today's date for daily keys
- today <- format(Sys.Date(), "%Y-%m-%d")
-
   tryCatch({
-    # Running totals (all-time)
-    message("[LOGGING] Updating running totals...")
-    upstash_command(c("INCR", "nicar:total_requests"))
-    upstash_command(c("INCRBYFLOAT", "nicar:total_input_tokens", as.character(input_tokens)))
-    upstash_command(c("INCRBYFLOAT", "nicar:total_output_tokens", as.character(output_tokens)))
-    upstash_command(c("INCRBYFLOAT", "nicar:total_cost", as.character(total_cost)))
+    message("[LOGGING] Inserting row into api_usage table...")
 
-    # Daily totals (for tracking by day)
-    message("[LOGGING] Updating daily totals for ", today)
-    upstash_command(c("INCR", paste0("nicar:daily:", today, ":requests")))
-    upstash_command(c("INCRBYFLOAT", paste0("nicar:daily:", today, ":cost"), as.character(total_cost)))
+    result <- supabase_request(
+      endpoint = "/rest/v1/api_usage",
+      method = "POST",
+      body = list(
+        timestamp = timestamp,
+        date = date,
+        model = model,
+        key_source = key_source,
+        input_tokens = input_tokens,
+        output_tokens = output_tokens,
+        input_cost = input_cost,
+        output_cost = output_cost,
+        total_cost = total_cost
+      )
+    )
 
-    # Track which days have data (for listing)
-    upstash_command(c("SADD", "nicar:days", today))
-
-    message("[LOGGING] Upstash logging complete")
-    TRUE
+    if (isTRUE(result)) {
+      message("[LOGGING] Supabase logging complete")
+      TRUE
+    } else {
+      message("[LOGGING] Supabase logging may have failed")
+      FALSE
+    }
   }, error = function(e) {
-    message("[LOGGING] Upstash logging error: ", e$message)
+    message("[LOGGING] Supabase logging error: ", e$message)
     FALSE
   })
 }
 
-#' Get running totals from Upstash
+#' Get all logs from Supabase
+#' @param date Optional date to filter by (format: "YYYY-MM-DD"). Use NULL for all logs.
+#' @param limit Maximum number of rows to return (default 1000)
+#' @return Data frame with all log columns
+get_supabase_logs <- function(date = NULL, limit = 1000) {
+  if (!supabase_configured()) {
+    return(data.frame(
+      timestamp = character(),
+      date = character(),
+      model = character(),
+      key_source = character(),
+      input_tokens = integer(),
+      output_tokens = integer(),
+      input_cost = numeric(),
+      output_cost = numeric(),
+      total_cost = numeric()
+    ))
+  }
+
+  query <- list(
+    select = "*",
+    order = "timestamp.desc",
+    limit = as.character(limit)
+  )
+
+  if (!is.null(date)) {
+    query$date <- paste0("eq.", date)
+  }
+
+  result <- supabase_request(
+    endpoint = "/rest/v1/api_usage",
+    method = "GET",
+    query = query
+  )
+
+  if (is.null(result) || length(result) == 0) {
+    return(data.frame(
+      timestamp = character(),
+      date = character(),
+      model = character(),
+      key_source = character(),
+      input_tokens = integer(),
+      output_tokens = integer(),
+      input_cost = numeric(),
+      output_cost = numeric(),
+      total_cost = numeric()
+    ))
+  }
+
+  # Convert list of lists to data frame
+  do.call(rbind, lapply(result, as.data.frame))
+}
+
+#' Get aggregated totals from Supabase
+#' @param date Optional date to filter by. Use NULL for all-time totals.
 #' @return List with total_requests, total_input_tokens, total_output_tokens, total_cost
-get_upstash_totals <- function() {
-  if (!upstash_configured()) {
+get_supabase_totals <- function(date = NULL) {
+  if (!supabase_configured()) {
     return(list(
       total_requests = NA,
       total_input_tokens = NA,
@@ -124,80 +213,82 @@ get_upstash_totals <- function() {
     ))
   }
 
+  # Get all logs (or filtered by date) and aggregate in R
+
+  # Supabase REST API doesn't support aggregation directly without RPC
+  logs <- get_supabase_logs(date = date, limit = 10000)
+
+  if (nrow(logs) == 0) {
+    return(list(
+      total_requests = 0L,
+      total_input_tokens = 0L,
+      total_output_tokens = 0L,
+      total_cost = 0,
+      configured = TRUE
+    ))
+  }
+
   list(
-    total_requests = as.integer(upstash_command(c("GET", "nicar:total_requests")) %||% 0),
-    total_input_tokens = as.numeric(upstash_command(c("GET", "nicar:total_input_tokens")) %||% 0),
-    total_output_tokens = as.numeric(upstash_command(c("GET", "nicar:total_output_tokens")) %||% 0),
-    total_cost = as.numeric(upstash_command(c("GET", "nicar:total_cost")) %||% 0),
+    total_requests = nrow(logs),
+    total_input_tokens = sum(logs$input_tokens, na.rm = TRUE),
+    total_output_tokens = sum(logs$output_tokens, na.rm = TRUE),
+    total_cost = sum(logs$total_cost, na.rm = TRUE),
     configured = TRUE
   )
 }
 
-#' Get daily usage stats from Upstash
-#' @param date Optional date (defaults to today). Use "all" to get all days.
-#' @return Data frame with date, requests, and cost
-get_upstash_daily <- function(date = NULL) {
- if (!upstash_configured()) {
-    return(data.frame(date = character(), requests = integer(), cost = numeric()))
- }
-
- if (is.null(date)) {
-    date <- format(Sys.Date(), "%Y-%m-%d")
- }
-
- if (date == "all") {
-    # Get all days that have data
-    days <- upstash_command(c("SMEMBERS", "nicar:days"))
-    if (is.null(days) || length(days) == 0) {
-      return(data.frame(date = character(), requests = integer(), cost = numeric()))
-    }
-    # Sort days
-    days <- sort(unlist(days))
-
-    # Get stats for each day
-    results <- lapply(days, function(d) {
-      data.frame(
-        date = d,
-        requests = as.integer(upstash_command(c("GET", paste0("nicar:daily:", d, ":requests"))) %||% 0),
-        cost = as.numeric(upstash_command(c("GET", paste0("nicar:daily:", d, ":cost"))) %||% 0)
-      )
-    })
-    do.call(rbind, results)
- } else {
-    # Get stats for specific date
-    data.frame(
-      date = date,
-      requests = as.integer(upstash_command(c("GET", paste0("nicar:daily:", date, ":requests"))) %||% 0),
-      cost = as.numeric(upstash_command(c("GET", paste0("nicar:daily:", date, ":cost"))) %||% 0)
-    )
- }
-}
-
-#' Reset Upstash counters (use with caution!)
-#' @param daily_too If TRUE, also deletes daily stats. Default FALSE.
-#' @return TRUE if successful
-reset_upstash_totals <- function(daily_too = FALSE) {
-  if (!upstash_configured()) return(FALSE)
-
-  # Reset running totals
-  upstash_command(c("SET", "nicar:total_requests", "0"))
-  upstash_command(c("SET", "nicar:total_input_tokens", "0"))
-  upstash_command(c("SET", "nicar:total_output_tokens", "0"))
-  upstash_command(c("SET", "nicar:total_cost", "0"))
-
-  if (daily_too) {
-    # Get all days and delete their keys
-    days <- upstash_command(c("SMEMBERS", "nicar:days"))
-    if (!is.null(days) && length(days) > 0) {
-      for (d in days) {
-        upstash_command(c("DEL", paste0("nicar:daily:", d, ":requests")))
-        upstash_command(c("DEL", paste0("nicar:daily:", d, ":cost")))
-      }
-    }
-    upstash_command(c("DEL", "nicar:days"))
+#' Get daily usage summary from Supabase
+#' @return Data frame with date, requests, and total_cost per day
+get_supabase_daily <- function() {
+  if (!supabase_configured()) {
+    return(data.frame(date = character(), requests = integer(), total_cost = numeric()))
   }
 
-  TRUE
+  logs <- get_supabase_logs(limit = 10000)
+
+  if (nrow(logs) == 0) {
+    return(data.frame(date = character(), requests = integer(), total_cost = numeric()))
+  }
+
+  # Aggregate by date
+  daily <- aggregate(
+    cbind(requests = 1, total_cost = logs$total_cost),
+    by = list(date = logs$date),
+    FUN = sum
+  )
+  daily$requests <- as.integer(daily$requests)
+  daily[order(daily$date, decreasing = TRUE), ]
+}
+
+#' Delete logs from Supabase (use with caution!)
+#' @param before_date Optional: delete logs before this date. If NULL, deletes ALL logs.
+#' @return TRUE if successful
+delete_supabase_logs <- function(before_date = NULL) {
+  if (!supabase_configured()) return(FALSE)
+
+  query <- list()
+  if (!is.null(before_date)) {
+    query$date <- paste0("lt.", before_date)
+  } else {
+    # Delete all - need some condition for Supabase
+    query$id <- "gt.0"
+  }
+
+  tryCatch({
+    req <- httr2::request(paste0(Sys.getenv("SUPABASE_URL"), "/rest/v1/api_usage")) |>
+      httr2::req_method("DELETE") |>
+      httr2::req_headers(
+        apikey = Sys.getenv("SUPABASE_KEY"),
+        Authorization = paste("Bearer", Sys.getenv("SUPABASE_KEY"))
+      ) |>
+      httr2::req_url_query(!!!query)
+
+    httr2::req_perform(req)
+    TRUE
+  }, error = function(e) {
+    message("Supabase delete error: ", e$message)
+    FALSE
+  })
 }
 
 # ==== LOCAL CSV FUNCTIONS ====
@@ -272,8 +363,18 @@ log_api_usage <- function(
     )
   )
 
-  # Also log to Upstash if configured (for cloud deployment)
-  log_to_upstash(input_tokens, output_tokens, cost$total_cost)
+  # Also log to Supabase if configured (for cloud deployment)
+  log_to_supabase(
+    timestamp = format(timestamp, "%Y-%m-%dT%H:%M:%S%z"),
+    date = as.character(as.Date(timestamp)),
+    model = model,
+    key_source = key_source,
+    input_tokens = input_tokens,
+    output_tokens = output_tokens,
+    input_cost = cost$input_cost,
+    output_cost = cost$output_cost,
+    total_cost = cost$total_cost
+  )
 
   invisible(log_entry)
 }
