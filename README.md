@@ -70,6 +70,12 @@ shiny::runApp()
 
 Or in RStudio, open `app.R` and click "Run App".
 
+### Note on Usage Logging
+
+The app has optional API usage logging for cost monitoring, but **logging is disabled by default**. If `NICAR_CHATBOT_LOG_USAGE` isn't in your environment, logging is simply skipped - you don't need to set anything and the app won't error.
+
+If you want to enable logging (e.g., for your own deployment), set `NICAR_CHATBOT_LOG_USAGE=TRUE` in your `.Renviron` file. See `claude_explains_shiny_app.md` for details.
+
 ## File Structure
 
 | File | Description |

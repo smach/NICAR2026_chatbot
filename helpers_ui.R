@@ -11,25 +11,21 @@ header_content <- div(
   ),
   h1(
     "NICAR 2026 Session Explorer",
-    style = "margin: 0; font-weight: 300; font-size: 2.5rem;"
-  ),
-  h3(
-    "AI-Powered Conference Session Discovery",
-    style = "margin: 10px 0; font-weight: 300; opacity: 0.9;"
+    style = "margin: 0; font-weight: 300; font-size: 2rem;"
   ),
   p(
-    "📍 Indianapolis • March 5-8, 2026",
-    style = "margin: 10px 0; font-size: 16px; opacity: 0.8;"
+    "AI-Powered Session Discovery • 📍 Indianapolis, March 5-8, 2026",
+    style = "margin: 6px 0; font-size: 15px; opacity: 0.9;"
   ),
   p(
-    "⚠️ AI can make mistakes - always verify details on the ",
+    "⚠️ AI can make mistakes - verify on the ",
     a(
       "official schedule",
       href = "https://schedules.ire.org/nicar-2026/",
       target = "_blank",
-      style = "color: #F5B800; font-weight: bold; text-decoration: underline;"
+      style = "color: #F5B800; text-decoration: underline;"
     ),
-    style = "margin: 15px 0; font-size: 14px;"
+    style = "margin: 6px 0 0 0; font-size: 12px; opacity: 0.7;"
   )
 )
 
@@ -42,8 +38,8 @@ custom_style <- HTML(
       .header-section {
         background: #2B4C5E;      /* solid dark color */
         color: #ffffff;
-        padding: 20px;
-        margin: -15px -15px 15px -15px;
+        padding: 12px 20px;
+        margin: -15px -15px 8px -15px;
         text-align: center;        /* <-- centering */
         position: relative;        /* for GitHub icon positioning */
       }

@@ -42,24 +42,24 @@ ui <- page_fillable(
 
       # Sample questions
       div(
-        style = "margin-bottom: 15px;",
+        style = "margin-bottom: 8px;",
         h5(
           "Try these questions:",
-          style = "margin-top: 0; color: #2B4C5E; font-weight: 600;"
+          style = "margin: 0 0 6px 0; font-size: 14px; color: #2B4C5E; font-weight: 600;"
         ),
         actionButton(
           "ask_mapping",
-          "🧰 What sessions are about mapping?",
+          "🗺️ What sessions are about mapping?",
           class = "btn-sample-questions"
         ),
         actionButton(
           "ask_thursday",
-          "📊 Are there any generative AI sessions happening Thursday morning?",
+          "🤖 Are there any generative AI sessions happening Thursday morning?",
           class = "btn-sample-questions"
         ),
         actionButton(
           "ask_spreadsheets",
-          "✨ Which sessions cover spreadsheets for beginners?",
+          "📊 Which sessions cover spreadsheets for beginners?",
           class = "btn-sample-questions"
         )
       ),

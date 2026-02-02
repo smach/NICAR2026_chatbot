@@ -1,5 +1,15 @@
 # helpers_logging.R
 # Token usage logging and cost tracking for Gemini API
+# Supports both local CSV logging and Upstash Redis for cloud deployment
+#
+# To disable logging, set NICAR_CHATBOT_LOG_USAGE=false in your environment or .Renviron
+# Logging is disabled by default for local development
+
+#' Check if usage logging is enabled
+#' @return TRUE if NICAR_CHATBOT_LOG_USAGE env var is "true" (case-insensitive)
+logging_enabled <- function() {
+ tolower(Sys.getenv("NICAR_CHATBOT_LOG_USAGE", "false")) == "true"
+}
 
 # Pricing constants for gemini-2.5-flash
 # As of Feb 2025: $0.30 per million input tokens, $2.50 per million output tokens
@@ -28,6 +38,94 @@ calculate_cost <- function(
   )
 }
 
+# ==== UPSTASH REDIS FUNCTIONS ====
+
+#' Check if Upstash is configured
+#' @return TRUE if UPSTASH_URL and UPSTASH_TOKEN are set
+upstash_configured <- function() {
+  nzchar(Sys.getenv("UPSTASH_URL")) && nzchar(Sys.getenv("UPSTASH_TOKEN"))
+}
+
+#' Execute an Upstash Redis command
+#' @param command Vector of command parts (e.g., c("INCRBYFLOAT", "key", "1.5"))
+#' @return Parsed response or NULL on error
+upstash_command <- function(command) {
+  if (!upstash_configured()) return(NULL)
+
+  url <- Sys.getenv("UPSTASH_URL")
+  token <- Sys.getenv("UPSTASH_TOKEN")
+
+  tryCatch({
+    resp <- httr2::request(url) |>
+      httr2::req_headers(Authorization = paste("Bearer", token)) |>
+      httr2::req_body_json(command) |>
+      httr2::req_perform() |>
+      httr2::resp_body_json()
+    resp$result
+  }, error = function(e) {
+    message("Upstash error: ", e$message)
+    NULL
+  })
+}
+
+#' Log usage to Upstash Redis (increments running totals)
+#' @param input_tokens Number of input tokens
+#' @param output_tokens Number of output tokens
+#' @param total_cost Total cost for this request
+#' @return TRUE if successful, FALSE otherwise
+log_to_upstash <- function(input_tokens, output_tokens, total_cost) {
+  if (!upstash_configured()) return(FALSE)
+
+  # Use a pipeline to run multiple commands atomically
+  # Increment: total_requests, total_input_tokens, total_output_tokens, total_cost
+  tryCatch({
+    upstash_command(c("INCR", "nicar:total_requests"))
+    upstash_command(c("INCRBYFLOAT", "nicar:total_input_tokens", as.character(input_tokens)))
+    upstash_command(c("INCRBYFLOAT", "nicar:total_output_tokens", as.character(output_tokens)))
+    upstash_command(c("INCRBYFLOAT", "nicar:total_cost", as.character(total_cost)))
+    TRUE
+  }, error = function(e) {
+    message("Upstash logging error: ", e$message)
+    FALSE
+  })
+}
+
+#' Get running totals from Upstash
+#' @return List with total_requests, total_input_tokens, total_output_tokens, total_cost
+get_upstash_totals <- function() {
+  if (!upstash_configured()) {
+    return(list(
+      total_requests = NA,
+      total_input_tokens = NA,
+      total_output_tokens = NA,
+      total_cost = NA,
+      configured = FALSE
+    ))
+  }
+
+  list(
+    total_requests = as.integer(upstash_command(c("GET", "nicar:total_requests")) %||% 0),
+    total_input_tokens = as.numeric(upstash_command(c("GET", "nicar:total_input_tokens")) %||% 0),
+    total_output_tokens = as.numeric(upstash_command(c("GET", "nicar:total_output_tokens")) %||% 0),
+    total_cost = as.numeric(upstash_command(c("GET", "nicar:total_cost")) %||% 0),
+    configured = TRUE
+  )
+}
+
+#' Reset Upstash counters (use with caution!)
+#' @return TRUE if successful
+reset_upstash_totals <- function() {
+  if (!upstash_configured()) return(FALSE)
+
+  upstash_command(c("SET", "nicar:total_requests", "0"))
+  upstash_command(c("SET", "nicar:total_input_tokens", "0"))
+  upstash_command(c("SET", "nicar:total_output_tokens", "0"))
+  upstash_command(c("SET", "nicar:total_cost", "0"))
+  TRUE
+}
+
+# ==== LOCAL CSV FUNCTIONS ====
+
 #' Get log directory (Posit Connect Cloud compatible)
 #' Uses CONNECT_DATA_DIR on Connect, falls back to logs/ locally
 #' @return Path to log directory
@@ -39,13 +137,17 @@ get_log_dir <- function() {
   log_dir
 }
 
-#' Log a single API call to CSV
+#' Log a single API call to CSV and Upstash (if configured)
+#'
+#' Logging is controlled by the NICAR_CHATBOT_LOG_USAGE environment variable.
+#' Set NICAR_CHATBOT_LOG_USAGE=TRUE to enable logging, otherwise logging is skipped.
+#'
 #' @param input_tokens Number of input tokens
 #' @param output_tokens Number of output tokens
 #' @param model Model name
 #' @param key_source Source of API key: "app_key" (environment) or "user_key" (user-provided)
 #' @param timestamp Timestamp of the API call
-#' @return Invisibly returns the log entry data frame
+#' @return Invisibly returns the log entry data frame (or NULL if logging disabled)
 log_api_usage <- function(
   input_tokens,
   output_tokens,
@@ -53,6 +155,11 @@ log_api_usage <- function(
   key_source = "app_key",
   timestamp = Sys.time()
 ) {
+  # Skip logging if disabled
+ if (!logging_enabled()) {
+    return(invisible(NULL))
+ }
+
   cost <- calculate_cost(input_tokens, output_tokens, model)
 
   log_entry <- data.frame(
@@ -68,9 +175,8 @@ log_api_usage <- function(
     stringsAsFactors = FALSE
   )
 
+  # Log to local CSV
   log_file <- file.path(get_log_dir(), "api_usage.csv")
-
-  # Append to CSV (create with header if new)
   write_header <- !file.exists(log_file)
   suppressWarnings(
     write.table(
@@ -83,6 +189,9 @@ log_api_usage <- function(
       quote = TRUE
     )
   )
+
+  # Also log to Upstash if configured (for cloud deployment)
+  log_to_upstash(input_tokens, output_tokens, cost$total_cost)
 
   invisible(log_entry)
 }

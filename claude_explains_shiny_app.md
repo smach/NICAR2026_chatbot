@@ -264,38 +264,67 @@ This architecture aims to create a powerful, user-friendly interface for confere
 
 ## Token Usage Logging
 
-The app tracks API usage and costs for monitoring and budgeting purposes. _It does not store any query or user data._
+The app can track API usage and costs for monitoring and budgeting purposes. _It does not store any query or user data._
+
+**Logging is disabled by default.** If `NICAR_CHATBOT_LOG_USAGE` is not set in your environment, logging is simply skipped - you don't need to set it to `false` and the app won't error. This is intentional so that people running the app locally don't need to configure anything.
+
+### Enabling Logging
+
+To enable logging, set the `NICAR_CHATBOT_LOG_USAGE` environment variable to `true`:
+
+```r
+# In .Renviron file:
+NICAR_CHATBOT_LOG_USAGE=TRUE
+```
 
 ### Logging Infrastructure (`helpers_logging.R`)
 
 - **Pricing**: Configured for gemini-2.5-flash ($0.30/M input, $2.50/M output)
-- **Log Location**:
-  - Posit Connect Cloud: Uses `CONNECT_DATA_DIR` environment variable
-  - Local: `logs/` subdirectory
-- **Log Format**: CSV with timestamp, date, model, tokens, and costs
+- **Toggle**: `NICAR_CHATBOT_LOG_USAGE` environment variable (default: `false`)
+- **Local logging**: CSV file in `logs/` subdirectory (always enabled when `NICAR_CHATBOT_LOG_USAGE=TRUE`)
+- **Cloud logging**: Upstash Redis (only when `UPSTASH_URL` and `UPSTASH_TOKEN` are also set)
+
+**You can use local CSV logging without setting up Upstash.** Just set `NICAR_CHATBOT_LOG_USAGE=TRUE` and the app will write to `logs/api_usage.csv`. Upstash is only needed for cloud deployments where the file system is ephemeral.
 
 ### Key Functions
 
-- `log_api_usage()`: Records each API call for token counts and costs
+- `logging_enabled()`: Checks if `NICAR_CHATBOT_LOG_USAGE=TRUE`
+- `log_api_usage()`: Records each API call (to CSV locally, to Upstash in cloud)
 - `calculate_cost()`: Computes cost from token counts
 - `extract_last_turn_usage()`: Gets token usage from ellmer chat object
-- `get_daily_summary()`: Returns aggregated stats for a date (for local testing)
+- `get_daily_summary()`: Returns aggregated stats for a date (local CSV only)
+- `get_upstash_totals()`: Returns running totals from Upstash Redis
+- `reset_upstash_totals()`: Resets all Upstash counters to zero
 
-### Accessing Logs on Posit Connect Cloud
+### Local Development
 
-The CSV is stored in the persistent data directory (`CONNECT_DATA_DIR`). To download:
-1. Go to your app in Posit Connect Cloud dashboard
-2. Click "Data" or "Files" in the app settings
-3. Download `api_usage.csv`
-4. Open in Excel/R to review daily/monthly totals
+When running locally with `NICAR_CHATBOT_LOG_USAGE=TRUE`, logs are written to `logs/api_usage.csv`.
 
-The CSV columns are: `timestamp`, `date`, `model`, `input_tokens`, `output_tokens`, `input_cost`, `output_cost`, `total_cost`
+CSV columns: `timestamp`, `date`, `model`, `key_source`, `input_tokens`, `output_tokens`, `input_cost`, `output_cost`, `total_cost`
 
-To get daily/monthly summaries locally after downloading:
+To get daily summaries:
 ```r
-logs <- read.csv("api_usage.csv")
+source("helpers_logging.R")
+get_daily_summary()  # Today's totals
+
+# Or manually:
+logs <- read.csv("logs/api_usage.csv")
 logs |>
-  dplyr::mutate(date = as.Date(date)) |>
   dplyr::group_by(date) |>
-  dplyr::summarise(requests = n(), total_cost = sum(total_cost))
+  dplyr::summarise(requests = dplyr::n(), total_cost = sum(total_cost))
+```
+
+### Cloud Deployment (Posit Connect Cloud)
+
+For cloud deployment, the app uses Upstash Redis to store running totals (since Posit Connect Cloud has ephemeral storage).
+
+Set these environment variables on Connect Cloud:
+- `NICAR_CHATBOT_LOG_USAGE=TRUE`
+- `UPSTASH_URL` - Your Upstash REST URL
+- `UPSTASH_TOKEN` - Your Upstash REST token
+
+View totals in the Upstash web dashboard or via:
+```r
+source("helpers_logging.R")
+get_upstash_totals()
 ```
