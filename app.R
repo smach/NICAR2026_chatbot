@@ -80,7 +80,7 @@ ui <- page_fillable(
           )
         ),
         placeholder = "Ask about conference sessions...",
-        height = "400px"
+        height = "calc(100vh - 320px)"
       )
     ),
 
@@ -439,10 +439,21 @@ server <- function(input, output, session) {
           "TIME HANDLING:\n",
           "Convert times to 24-hour HH:MM format. Morning: 08:00-12:00, Afternoon: 13:00-18:00.\n\n",
 
-          "After finding sessions, call highlight_sessions with recommended titles. ",
-          "Include: Title, Track, Day & Time, Room, Speakers, brief description. ",
-          "If no sessions match, say so and suggest broadening the search. ",
-          "End with a reminder to check the official schedule."
+          "RESPONSE FORMAT:\n",
+          "Use 12-hour time (e.g., 2:30 pm). Keep descriptions to 1-2 sentences MAX.\n",
+          "End each line with TWO SPACES for single line breaks. Use blank line between sessions.\n\n",
+          "Example (note: each line ends with two spaces except the last line of each session):\n\n",
+          "**Intro to Python**  \n",
+          "Thu 9 am, Room 203  \n",
+          "Speaker: Jane Doe, NYT  \n",
+          "Learn Python basics for data journalism.\n\n",
+          "**Advanced SQL**  \n",
+          "Fri 2 pm, Room 105  \n",
+          "Speakers: John Smith, WaPo; Sarah Lee, AP  \n",
+          "Master complex SQL queries.\n\n",
+          "After listing sessions, call highlight_sessions with the titles. ",
+          "If no sessions match, say so briefly. ",
+          "End with a short reminder to verify on the official schedule."
         )
 
         # Create chat ====
@@ -610,13 +621,9 @@ server <- function(input, output, session) {
       # Show "Filter to these sessions" button
       div(
         style = "background: #e8f5e9; padding: 10px; border-radius: 8px; border: 1px solid #8FB339;",
-        p(
-          paste("Found", length(titles), "sessions"),
-          style = "margin: 0 0 8px 0; font-size: 13px; color: #2B4C5E; font-weight: 500;"
-        ),
         actionButton(
           "show_in_table",
-          paste("Show These", length(titles), "Sessions in Table"),
+          paste("See These", length(titles), "Sessions in Table"),
           icon = icon("table"),
           class = "btn-conference",
           style = "width: 100%;"

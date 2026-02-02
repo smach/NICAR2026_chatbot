@@ -66,25 +66,25 @@ custom_style <- HTML(
       /* Assistant messages - white background with dark text */
       .shinychat-message-assistant .shinychat-message-content {
         background-color: #ffffff !important;
-        color: #2B4C5E !important; /* Ensures readable text */
+        color: #2B4C5E !important;
         border: 1px solid #d0d0d0 !important;
-        padding: 15px !important;
-        border-radius: 8px !important;
-        margin: 10px 0 !important;
-        font-size: 15px !important;
-        line-height: 1.7 !important;
+        padding: 10px 12px !important;
+        border-radius: 6px !important;
+        margin: 6px 0 !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
       }
-      
+
       /* User messages - very light background with dark text */
       .shinychat-message-user .shinychat-message-content {
         background-color: #f0f0f0 !important;
-        color: #2B4C5E !important; /* Ensures readable text */
+        color: #2B4C5E !important;
         border: 1px solid #d0d0d0 !important;
-        padding: 15px !important;
-        border-radius: 8px !important;
-        margin: 10px 0 !important;
-        font-size: 15px !important;
-        line-height: 1.7 !important;
+        padding: 10px 12px !important;
+        border-radius: 6px !important;
+        margin: 6px 0 !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
       }
       
       /* Make sure headings in chat are also dark */
@@ -98,16 +98,22 @@ custom_style <- HTML(
         font-weight: 600 !important;
       }
       
-      /* Ensure lists are readable */
+      /* Ensure lists are readable but compact */
       .shinychat-messages ul,
       .shinychat-messages ol {
         color: #2B4C5E !important;
-        padding-left: 20px !important;
+        padding-left: 16px !important;
+        margin: 4px 0 !important;
       }
-      
+
       .shinychat-messages li {
         color: #2B4C5E !important;
-        margin-bottom: 8px !important;
+        margin-bottom: 4px !important;
+      }
+
+      /* Compact paragraphs in chat */
+      .shinychat-messages p {
+        margin: 4px 0 !important;
       }
       
       /* ---------- SAMPLE QUESTION BUTTONS ---------- */
