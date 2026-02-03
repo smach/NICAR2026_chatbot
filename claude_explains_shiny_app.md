@@ -16,8 +16,9 @@ This Shiny app creates an interactive conference session discovery tool that all
 
 1. **Dual Search Capability**: Topic-based semantic search and speaker/organization keyword search
 2. **Filter Button**: After AI finds sessions, users can filter the table to show only recommended sessions
-3. **Interactive Table**: Columns for Session Title, Day, Time, Speakers, Room, Skill Level, Track
-4. **Expandable Details**: Click any row to see Description, Date, Type, and Cost
+3. **Recording Status**: Filter and view which sessions will be recorded
+4. **Interactive Table**: Columns for Session Title, Day, Time, Speakers, Room, Recorded, Skill Level, Track
+5. **Expandable Details**: Click any row to see Description, Date, Type, Cost, and Recording status
 
 ## Code Breakdown
 
@@ -71,11 +72,11 @@ The app has two search functions, each optimized for different query types:
 ```r
 retrieve_sessions_filtered <- function(query, day = NULL, start_time = NULL,
                                         end_time = NULL, session_type = NULL,
-                                        skill_level = NULL, top_k = 20)
+                                        skill_level = NULL, recorded = NULL, top_k = 20)
 ```
 
 This function:
--   Takes a search query and optional filters (day, time range, type, skill level)
+-   Takes a search query and optional filters (day, time range, type, skill level, recording status)
 -   Builds filter expressions for the database query using rlang
 -   Uses `ragnar_retrieve_vss()` similarity search
 -   Returns relevant sessions with their details
@@ -188,12 +189,13 @@ output$session_table <- renderReactable({
 
 Creates an interactive table with:
 
--   **Visible columns** (in order): Session Title, Day, Time, Speakers, Room, Skill Level, Track
+-   **Visible columns** (in order): Session Title, Day, Time, Speakers, Room, Recorded, Skill Level, Track
 -   **Hidden but searchable**: Description, Date, Cost, Type, text
--   Expandable rows showing: Description (prominent), Date, Type, Cost
+-   Expandable rows showing: Description (prominent), Date, Type, Cost, Recorded status
 -   Color-coded days (Thursday=green, Friday=yellow, Saturday=blue, Sunday=purple)
 -   Links to the official NICAR schedule
 -   Global table search bar includes regular expression capability
+-   Recorded column has a dropdown filter (All/Yes/No) for filtering by recording status
 -   Filtering support when AI recommends sessions
 
 ### 3. **Helper Files**

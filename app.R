@@ -187,6 +187,7 @@ server <- function(input, output, session) {
     end_time = NULL,
     session_type = NULL,
     skill_level = NULL,
+    recorded = NULL,
     top_k = 20
   ) {
     # Initialize filter components
@@ -220,6 +221,12 @@ server <- function(input, output, session) {
       filter_components$skill <- rlang::expr(SkillLevel == !!skill_level)
     }
 
+    # Add recorded filter (stored as VARCHAR "TRUE"/"FALSE" in DuckDB, not R Boolean)
+    if (!is.null(recorded)) {
+      recorded_str <- if (isTRUE(recorded)) "TRUE" else "FALSE"
+      filter_components$recorded <- rlang::expr(Recorded == !!recorded_str)
+    }
+
     # Combine all filter components with AND logic
     if (length(filter_components) == 0) {
       filter_expr <- NULL
@@ -249,7 +256,8 @@ server <- function(input, output, session) {
         Time,
         Room,
         SkillLevel,
-        Type
+        Type,
+        Recorded
       )
   }
 
@@ -432,6 +440,10 @@ server <- function(input, output, session) {
               description = "Filter by skill level when user explicitly asks for beginner/advanced content.",
               required = FALSE
             ),
+            recorded = type_boolean(
+              description = "Filter by recording status. Use TRUE for recorded sessions only, FALSE for non-recorded. Only use when user explicitly asks about recorded/non-recorded sessions.",
+              required = FALSE
+            ),
             top_k = type_integer(
               "Number of sessions to retrieve (default: 20)",
               required = FALSE
@@ -454,6 +466,12 @@ server <- function(input, output, session) {
 
           "TIME HANDLING:\n",
           "Convert times to 24-hour HH:MM format. Morning: 08:00-12:00, Afternoon: 13:00-18:00.\n\n",
+
+          "RECORDING FILTER:\n",
+          "Use the recorded parameter ONLY when users explicitly ask about recorded sessions ",
+          "(e.g., 'which sessions are recorded', 'sessions I can watch later', 'non-recorded sessions'). ",
+          "Set recorded=TRUE for recorded sessions, recorded=FALSE for non-recorded. ",
+          "Do NOT use this filter for general queries.\n\n",
 
           "RESPONSE FORMAT:\n",
           "Use 12-hour time (e.g., 2:30 pm). Keep descriptions to 1-2 sentences MAX.\n",
@@ -734,6 +752,35 @@ server <- function(input, output, session) {
           width = 100,
           class = "cell-room"
         ),
+        # Recording status - whether session will be recorded
+        Recorded = colDef(
+          name = "Recorded",
+          width = 80,
+          align = "center",
+          filterable = TRUE,
+          filterInput = function(values, name) {
+            tags$select(
+              onchange = sprintf("Reactable.setFilter('session_table', '%s', event.target.value || undefined)", name),
+              tags$option(value = "", "All"),
+              tags$option(value = "true", "Yes"),
+              tags$option(value = "false", "No")
+            )
+          },
+          filterMethod = JS("function(rows, columnId, filterValue) {
+            return rows.filter(function(row) {
+              if (filterValue === 'true') return row.values[columnId] === true;
+              if (filterValue === 'false') return row.values[columnId] === false;
+              return true;
+            })
+          }"),
+          cell = function(value) {
+            if (isTRUE(value)) {
+              span(style = "color: #28a745;", "Yes")
+            } else {
+              span(style = "color: #dc3545;", "No")
+            }
+          }
+        ),
         # Skill level (Beginner, Intermediate, Advanced)
         SkillLevel = colDef(
           name = "Skill Level",
@@ -793,6 +840,10 @@ server <- function(input, output, session) {
               } else {
                 paste0("$", session$Cost)
               }
+            ),
+            tags$span(strong("Recorded:"), style = "color: #666;"),
+            tags$span(
+              if (isTRUE(session$Recorded)) "Yes - session will be recorded" else "No"
             )
           ),
           # Link to official schedule
@@ -810,12 +861,25 @@ server <- function(input, output, session) {
       },
       searchable = TRUE,
       # Custom regex search method - allows patterns like "python|R" or "data.*viz"
+      # Falls back to simple string match if regex is invalid (e.g., lone backslash)
       searchMethod = JS(
         "function(rows, columnIds, searchValue) {
-        const pattern = new RegExp(searchValue, 'i')
+        var pattern;
+        var useRegex = true;
+        try {
+          pattern = new RegExp(searchValue, 'i');
+        } catch (e) {
+          // Invalid regex - fall back to simple string includes
+          useRegex = false;
+        }
         return rows.filter(function(row) {
           return columnIds.some(function(columnId) {
-            return pattern.test(String(row.values[columnId]))
+            var cellValue = String(row.values[columnId]).toLowerCase();
+            if (useRegex) {
+              return pattern.test(cellValue);
+            } else {
+              return cellValue.includes(searchValue.toLowerCase());
+            }
           })
         })
       }"

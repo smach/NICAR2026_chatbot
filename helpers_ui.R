@@ -29,7 +29,7 @@ header_content <- div(
   )
 )
 
-chatbot_welcome <- "Welcome to this NICAR 2026 UNOFFICIAL app! 🎉 I'm here to help you find conference sessions during times when multiple activities are going on at once. I can search by topic, day, time, or level. What interests you?"
+chatbot_welcome <- "Welcome to this NICAR 2026 UNOFFICIAL app! 🎉 I'm here to help you find conference sessions during times when multiple activities are going on at once. I can search by topic, day, time, level, and if sessions are being recorded. What interests you?"
 
 
 custom_style <- HTML(

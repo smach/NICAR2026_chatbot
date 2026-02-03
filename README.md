@@ -14,6 +14,7 @@ The documentation below was written by Claude and lightly edited by me:
 - **Topic Search**: Semantic search for sessions by topic, skill level, or session type
 - **Speaker Search**: Keyword-based search for sessions by presenter name or organization
 - **Filter Button**: After AI finds sessions, click to filter the table to just those results
+- **Recording Status**: See which sessions will be recorded and filter by recording availability
 - **Interactive Table**: Browse all sessions with sorting, filtering, and search
 - **Expandable Details**: Click any session to see full description, date, type, and cost
 - **Color-Coded Days**: Visual distinction between Thursday, Friday, Saturday, and Sunday sessions
@@ -95,7 +96,7 @@ If you want to enable logging (e.g., for your own deployment), set `NICAR_CHATBO
 ### Chat Interface
 Ask questions like:
 - "What sessions are about data visualization?"
-- "Are there any Python sessions on Friday afternoon?"
+- "Are there any Python sessions on Friday afternoon that won't be recorded?"
 - "What sessions is Simon Willison leading?"
 - "Show me beginner-level hands-on sessions"
 
@@ -105,7 +106,7 @@ After the AI finds sessions, a green **"Show These X Sessions in Table"** button
 ### Table
 - **Search**: Use the search box to filter across all columns (regular expressions are supported in the global search but not the column filter boxes)
 - **Expand**: Click the triangle to see full session details
-- **Columns**: Session Title, Day, Time, Speakers, Room, Skill Level, Track
+- **Columns**: Session Title, Day, Time, Speakers, Room, Recorded, Skill Level, Track
 
 ## How It Works
 
@@ -116,7 +117,7 @@ After the AI finds sessions, a green **"Show These X Sessions in Table"** button
    - BM25 for keyword matching
 
 3. **Tool Calling**: The AI has three tools:
-   - `retrieve_sessions_filtered` - Topic-based semantic search
+   - `retrieve_sessions_filtered` - Topic-based semantic search with filters for day, time, type, skill level, and recording status
    - `search_sessions_by_speaker` - Keyword search for speakers/orgs
    - `highlight_sessions` - Enables the filter button
 

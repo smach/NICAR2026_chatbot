@@ -12,13 +12,14 @@ download.file(data_url, data_file, mode = "wb")
 sessions_df <- rio::import(data_file) |>
   mutate(
     session_id = as.character(session_id),
+    recorded = as.character(recorded),
     date = as.character(date),
     day = format(as.Date(date), "%A") # Add a column for day of week
   )
 
 
 # I'm going to add a text column with all the information I'd like:
-# The session title, speaker, date, starting time, room, level, day, tracks, type, skill_levelcost, and description.
+# The session title, speaker, date, starting time, room, level, day, tracks, type, skill_level, cost, recorded, and description.
 
 # I've added ### before the title because that signifies 'level 3 header' in markdown. Markdown is the preferred ragnar format and we'll be creating a single markdown document next.
 
@@ -52,6 +53,9 @@ sessions_df <- sessions_df |>
       "Cost: ",
       ifelse(is.na(cost), "", paste0("$", cost)),
       "\n\n",
+      "Recorded:",
+      recorded,
+      "\n",
       "Description: ",
       description,
       "\n\n" # Changed from "\n" to "\n\n"
@@ -92,6 +96,7 @@ sessions_chunks <- sessions_df |>
     Cost = cost,
     Day = day,
     Type = type,
+    Recorded = recorded,
     Time_24hr = format(parse_date_time(start_time, "I:M p"), "%H:%M"),
     context = title
   ) |>
@@ -114,7 +119,8 @@ sessions_metadata <- sessions_df |>
     SkillLevel = skill_level,
     Cost = cost,
     Day = day,
-    Type = type
+    Type = type,
+    Recorded = recorded
   ) |>
   mutate(
     Time_24hr = parse_date_time(Time, "I:M p"),
@@ -146,7 +152,13 @@ sessions_info_for_app <- sessions_chunks |>
     Date,
     Time_24hr,
     Cost,
+    Recorded,
     Type
+  )
+# Turn back to Boolean just for app, R table can handle but don't think DuckDB can understand R Boolean
+sessions_info_for_app <- sessions_info_for_app |>
+  mutate(
+    Recorded = if_else(Recorded == "TRUE", TRUE, FALSE)
   )
 rio::export(sessions_info_for_app, "sessions_info_for_app.parquet")
 
@@ -164,7 +176,8 @@ my_extra_columns <- data.frame(
   Cost = integer(),
   Type = character(),
   Time_24hr = character(),
-  Day = character()
+  Day = character(),
+  Recorded = character()
 )
 
 store_file_location <- "nicar_2026_sessions.duckdb"
