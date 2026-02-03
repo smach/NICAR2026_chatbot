@@ -32,7 +32,7 @@ ui <- page_fillable(
 
   layout_sidebar(
     sidebar = sidebar(
-      width = "40%",
+      width = "33%",
       open = "open",
       title = div(
         "🤖 NICAR 2026 Conference Assistant",
@@ -115,7 +115,6 @@ ui <- page_fillable(
     )
   ),
 
-
   # Minimal footer credit
   tags$footer(
     style = "
@@ -128,7 +127,9 @@ ui <- page_fillable(
       padding: 4px 8px;
       border-radius: 3px;
     ",
-    HTML("App by <a href='https://machlis.com' target='_blank' style='color: #888;'>Sharon Machlis</a> & Claude AI")
+    HTML(
+      "App by <a href='https://machlis.com' target='_blank' style='color: #888;'>Sharon Machlis</a> & Claude AI"
+    )
   )
 )
 
@@ -610,9 +611,13 @@ server <- function(input, output, session) {
     # CRITICAL: Capture token totals BEFORE the query starts
     # This allows us to calculate exactly how many tokens this query used
     prev_totals <- get_cumulative_tokens(chat)
-    message("[LOGGING] Starting query. Previous totals: ",
-            prev_totals$input_tokens, " input, ",
-            prev_totals$output_tokens, " output")
+    message(
+      "[LOGGING] Starting query. Previous totals: ",
+      prev_totals$input_tokens,
+      " input, ",
+      prev_totals$output_tokens,
+      " output"
+    )
 
     tryCatch(
       {
@@ -760,19 +765,24 @@ server <- function(input, output, session) {
           filterable = TRUE,
           filterInput = function(values, name) {
             tags$select(
-              onchange = sprintf("Reactable.setFilter('session_table', '%s', event.target.value || undefined)", name),
+              onchange = sprintf(
+                "Reactable.setFilter('session_table', '%s', event.target.value || undefined)",
+                name
+              ),
               tags$option(value = "", "All"),
               tags$option(value = "true", "Yes"),
               tags$option(value = "false", "No")
             )
           },
-          filterMethod = JS("function(rows, columnId, filterValue) {
+          filterMethod = JS(
+            "function(rows, columnId, filterValue) {
             return rows.filter(function(row) {
               if (filterValue === 'true') return row.values[columnId] === true;
               if (filterValue === 'false') return row.values[columnId] === false;
               return true;
             })
-          }"),
+          }"
+          ),
           cell = function(value) {
             if (isTRUE(value)) {
               span(style = "color: #28a745;", "Yes")
@@ -843,7 +853,11 @@ server <- function(input, output, session) {
             ),
             tags$span(strong("Recorded:"), style = "color: #666;"),
             tags$span(
-              if (isTRUE(session$Recorded)) "Yes - session will be recorded" else "No"
+              if (isTRUE(session$Recorded)) {
+                "Yes - session will be recorded"
+              } else {
+                "No"
+              }
             )
           ),
           # Link to official schedule
