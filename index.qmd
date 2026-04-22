@@ -1,0 +1,299 @@
+---
+title: "NICAR 2026 Session Explorer"
+format:
+  html:
+    page-layout: full
+    toc: false
+    theme: flatly
+    css: styles.css
+    include-in-header:
+      text: |
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+library(arrow)
+library(dplyr)
+library(reactable)
+library(htmltools)
+library(htmlwidgets)
+
+sessions_data <- read_parquet("sessions_info_for_app.parquet")
+```
+
+::: {.header-section}
+::: {.header-content}
+<a href="https://github.com/smach/NICAR2026_chatbot" target="_blank" title="View source on GitHub" class="github-link"><i class="fa-brands fa-github"></i></a>
+
+# NICAR 2026 Session Explorer
+
+AI-Powered Session Discovery • 📍 Indianapolis, March 5-8, 2026
+
+::: {.header-note}
+⚠️ AI can make mistakes - verify on the [official schedule](https://schedules.ire.org/nicar-2026/)
+:::
+:::
+:::
+
+::: {.app-layout}
+
+::: {.chat-sidebar}
+::: {.inactive-notice}
+## 🤖 Chatbot No Longer Active
+
+::: {.inactive-big-text}
+The AI chatbot is no longer running.
+:::
+
+::: {.inactive-explanation}
+To save on hosting and API costs, Sharon has taken the live chatbot offline.
+
+**Good news:** the full app is open source. You can view all the code on GitHub and run the chatbot yourself with your own (free-tier) Google Gemini API key.
+:::
+
+::: {.inactive-actions}
+<a href="https://github.com/smach/NICAR2026_chatbot" target="_blank" class="btn-conference">
+  <i class="fa-brands fa-github"></i> View code on GitHub (main branch)
+</a>
+
+<a href="https://github.com/smach/NICAR2026_chatbot#readme" target="_blank" class="btn-secondary">
+  📖 Setup instructions
+</a>
+:::
+
+::: {.inactive-footnote}
+The searchable session table on the right is still fully available.
+:::
+:::
+:::
+
+::: {.main-panel}
+
+::: {.table-header}
+::: {.table-header-left}
+### 📚 Session Directory
+
+Click any session for details • Search to filter • All descriptions are searchable
+:::
+
+::: {.stats-box}
+```{r stats}
+total <- nrow(sessions_data)
+thu <- sum(sessions_data$Day == "Thursday", na.rm = TRUE)
+fri <- sum(sessions_data$Day == "Friday", na.rm = TRUE)
+sat <- sum(sessions_data$Day == "Saturday", na.rm = TRUE)
+sun <- sum(sessions_data$Day == "Sunday", na.rm = TRUE)
+HTML(paste0(
+  "📊 ", total, " Total Sessions<br>",
+  "Thu: ", thu, " | Fri: ", fri, " | Sat: ", sat, " | Sun: ", sun
+))
+```
+:::
+:::
+
+```{r session-table}
+table_theme <- reactableTheme(
+  searchInputStyle = list(
+    width = "100%",
+    backgroundColor = "#ffffff",
+    border = "2px solid #e0e0e0",
+    borderRadius = "4px",
+    padding = "8px 12px",
+    fontSize = "14px"
+  ),
+  headerStyle = list(
+    background = "#A8C6C4",
+    color = "#2B4C5E",
+    fontWeight = "600",
+    fontSize = "14px"
+  ),
+  rowStyle = list(
+    cursor = "pointer",
+    "&:hover" = list(background = "#f0f8f6")
+  )
+)
+
+reactable(
+  sessions_data,
+  columns = list(
+    Title = colDef(
+      name = "Session Title",
+      minWidth = 280,
+      class = "cell-title"
+    ),
+    Day = colDef(
+      name = "Day",
+      width = 90,
+      sortable = FALSE,
+      class = function(value) paste0("day-", tolower(value))
+    ),
+    Time = colDef(
+      name = "Time",
+      width = 85,
+      sortable = FALSE,
+      class = "cell-time"
+    ),
+    Speakers = colDef(
+      name = "Speakers",
+      minWidth = 180,
+      class = "cell-speakers"
+    ),
+    Room = colDef(
+      name = "Room",
+      width = 100,
+      class = "cell-room"
+    ),
+    Recorded = colDef(
+      name = "Recorded",
+      width = 80,
+      align = "center",
+      filterable = TRUE,
+      filterInput = function(values, name) {
+        tags$select(
+          onchange = sprintf(
+            "Reactable.setFilter('session-table', '%s', event.target.value || undefined)",
+            name
+          ),
+          tags$option(value = "", "All"),
+          tags$option(value = "true", "Yes"),
+          tags$option(value = "false", "No")
+        )
+      },
+      filterMethod = JS(
+        "function(rows, columnId, filterValue) {
+          return rows.filter(function(row) {
+            if (filterValue === 'true') return row.values[columnId] === true;
+            if (filterValue === 'false') return row.values[columnId] === false;
+            return true;
+          })
+        }"
+      ),
+      cell = function(value) {
+        if (isTRUE(value)) {
+          span(style = "color: #28a745;", "Yes")
+        } else {
+          span(style = "color: #dc3545;", "No")
+        }
+      }
+    ),
+    SkillLevel = colDef(
+      name = "Skill Level",
+      width = 100,
+      class = "cell-skill"
+    ),
+    Track = colDef(
+      name = "Track",
+      width = 150,
+      class = "cell-track"
+    ),
+    Description = colDef(show = FALSE, searchable = TRUE),
+    Date = colDef(show = FALSE),
+    Time_24hr = colDef(show = FALSE),
+    Cost = colDef(show = FALSE),
+    Type = colDef(show = FALSE)
+  ),
+  details = function(index) {
+    session <- sessions_data[index, ]
+    div(
+      style = "padding: 20px; background: #f8f9fa; border-left: 4px solid #8FB339;",
+      h4(
+        session$Title,
+        style = "color: #2B4C5E; margin-top: 0; font-weight: 600;"
+      ),
+      div(
+        style = "margin-bottom: 15px; padding: 15px; background: white; border-radius: 5px;",
+        p(
+          session$Description,
+          style = "line-height: 1.6; color: #333; margin: 0;"
+        )
+      ),
+      div(
+        style = "display: grid; grid-template-columns: auto 1fr; gap: 10px; margin-bottom: 15px;",
+        tags$span(strong("Date:"), style = "color: #666;"),
+        tags$span(paste(session$Day, "-", session$Date)),
+        tags$span(strong("Type:"), style = "color: #666;"),
+        tags$span(
+          if (is.na(session$Type) || session$Type == "") {
+            "Not specified"
+          } else {
+            session$Type
+          }
+        ),
+        tags$span(strong("Cost:"), style = "color: #666;"),
+        tags$span(
+          if (is.na(session$Cost) || session$Cost == "") {
+            "Free / Included"
+          } else {
+            paste0("$", session$Cost)
+          }
+        ),
+        tags$span(strong("Recorded:"), style = "color: #666;"),
+        tags$span(
+          if (isTRUE(session$Recorded)) {
+            "Yes - session will be recorded"
+          } else {
+            "No"
+          }
+        )
+      ),
+      div(
+        style = "margin-top: 15px; text-align: right;",
+        a(
+          "View in official schedule",
+          href = "https://schedules.ire.org/nicar-2026/",
+          target = "_blank",
+          class = "btn btn-sm",
+          style = "background-color: #8FB339; border-color: #8FB339; color: white;"
+        )
+      )
+    )
+  },
+  searchable = TRUE,
+  searchMethod = JS(
+    "function(rows, columnIds, searchValue) {
+      var pattern;
+      var useRegex = true;
+      try {
+        pattern = new RegExp(searchValue, 'i');
+      } catch (e) {
+        useRegex = false;
+      }
+      return rows.filter(function(row) {
+        return columnIds.some(function(columnId) {
+          var cellValue = String(row.values[columnId]).toLowerCase();
+          if (useRegex) {
+            return pattern.test(cellValue);
+          } else {
+            return cellValue.includes(searchValue.toLowerCase());
+          }
+        })
+      })
+    }"
+  ),
+  language = reactableLang(
+    searchPlaceholder = "Search (regex supported)"
+  ),
+  filterable = TRUE,
+  highlight = TRUE,
+  bordered = TRUE,
+  striped = FALSE,
+  pagination = TRUE,
+  defaultPageSize = 12,
+  showPageSizeOptions = TRUE,
+  pageSizeOptions = c(12, 25, 50, 100),
+  theme = table_theme,
+  elementId = "session-table"
+)
+```
+
+:::
+
+:::
+
+::: {.app-footer}
+App by [Sharon Machlis](https://machlis.com) & Claude AI
+:::
