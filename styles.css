@@ -74,7 +74,7 @@ main.content {
 /* ---------- APP LAYOUT ---------- */
 .app-layout {
   display: grid;
-  grid-template-columns: 33% 67%;
+  grid-template-columns: 280px 1fr;
   gap: 0;
   min-height: calc(100vh - 140px);
 }
@@ -224,10 +224,10 @@ main.content {
 }
 
 /* ---------- REACTABLE CELLS ---------- */
-.day-thursday { color: #8FB339; font-weight: 600; }
-.day-friday   { color: #F5B800; font-weight: 600; }
-.day-saturday { color: #4A90D9; font-weight: 600; }
-.day-sunday   { color: #9B59B6; font-weight: 600; }
+.day-thursday { color: #8FB339; font-weight: 600; white-space: nowrap; }
+.day-friday   { color: #F5B800; font-weight: 600; white-space: nowrap; }
+.day-saturday { color: #4A90D9; font-weight: 600; white-space: nowrap; }
+.day-sunday   { color: #9B59B6; font-weight: 600; white-space: nowrap; }
 
 .cell-title    { font-weight: 600; color: #2B4C5E; white-space: normal; line-height: 1.4; }
 .cell-speakers { font-size: 13px; color: #555; white-space: normal; line-height: 1.3; }

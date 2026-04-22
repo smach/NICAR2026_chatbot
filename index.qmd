@@ -127,7 +127,7 @@ reactable(
     ),
     Day = colDef(
       name = "Day",
-      width = 90,
+      width = 110,
       sortable = FALSE,
       class = function(value) paste0("day-", tolower(value))
     ),
